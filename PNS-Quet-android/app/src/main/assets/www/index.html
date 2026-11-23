@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>PNS Quét chuyển tuyến</title>
+<style>
+  :root { --cam: #f59e0b; --cam-dark: #b45309; --ok: #15803d; --bad: #b91c1c; --ink: #111827; --mute: #6b7280; --line: #e5e7eb; --bg: #f3f4f6; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 19px/1.4 Roboto, Arial, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--cam); color: #fff; }
+  header h1 { flex: 1; margin: 0; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header button { background: rgba(255,255,255,.22); color: #fff; border: 0; border-radius: 10px; font-size: 18px; padding: 8px 12px; }
+  main { padding: 14px; }
+  section { display: none; }
+  section.on { display: block; }
+  .big { display: block; width: 100%; min-height: 64px; border: 0; border-radius: 14px; font-size: 22px; font-weight: bold; padding: 12px; margin: 10px 0; }
+  .pri { background: var(--cam); color: #fff; }
+  .go { background: var(--ok); color: #fff; }
+  .sec { background: #fff; color: var(--ink); border: 2px solid var(--line); }
+  .big:disabled { opacity: .45; }
+  .card { background: #fff; border-radius: 14px; padding: 14px; margin: 10px 0; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .muted { color: var(--mute); font-size: 16px; }
+  input, textarea { width: 100%; font-size: 20px; padding: 12px; border: 2px solid var(--line); border-radius: 12px; background: #fff; }
+  textarea { min-height: 90px; font-size: 15px; }
+  .list button { display: block; width: 100%; text-align: left; background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 14px; margin: 8px 0; font-size: 20px; color: var(--ink); }
+  .list button b { color: var(--cam-dark); }
+  .list button.sel { border-color: var(--cam); background: #fffbeb; }
+  /* màn hình quét */
+  #camBox { position: relative; background: #000; border-radius: 14px; overflow: hidden; aspect-ratio: 4 / 3; max-height: 42vh; width: 100%; }
+  #camBox video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #camBox .guide { position: absolute; left: 6%; right: 6%; top: 30%; bottom: 30%; border: 3px solid rgba(245,158,11,.95); border-radius: 10px; box-shadow: 0 0 0 999px rgba(0,0,0,.25); pointer-events: none; }
+  #camBox .guide.qr { left: 20%; right: 20%; top: 10%; bottom: 10%; }
+  #camBox .flash { position: absolute; inset: 0; background: rgba(22,163,74,.45); opacity: 0; transition: opacity .25s; pointer-events: none; }
+  #camBox .flash.dup { background: rgba(234,88,12,.5); }
+  #camBox .flash.show { opacity: 1; transition: none; }
+  #camMsg { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; color: #fff; font-size: 16px; text-shadow: 0 1px 2px #000; }
+  .counter { display: flex; align-items: baseline; gap: 10px; margin: 10px 2px 0; }
+  .counter .n { font-size: 54px; font-weight: bold; color: var(--cam-dark); line-height: 1; }
+  .counter .last { flex: 1; text-align: right; font-family: monospace; font-size: 20px; }
+  .codes { list-style: none; padding: 0; margin: 8px 0; }
+  .codes li { display: flex; align-items: center; background: #fff; border-radius: 10px; padding: 8px 12px; margin: 6px 0; font-family: monospace; font-size: 20px; }
+  .codes li span { flex: 1; }
+  .codes li button { border: 0; background: #fee2e2; color: var(--bad); border-radius: 8px; font-size: 18px; width: 44px; height: 40px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .routeBar { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 18px; }
+  .routeBar b { flex: 1; color: var(--cam-dark); }
+  .routeBar button { border: 2px solid var(--line); background: #fff; border-radius: 10px; padding: 6px 10px; font-size: 16px; }
+  .status { font-weight: bold; }
+  .status.done { color: var(--ok); }
+  .status.wait { color: var(--cam-dark); }
+  .warn { background: #fff7ed; border: 2px solid #fdba74; }
+  .okbox { background: #f0fdf4; border: 2px solid #86efac; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: rgba(17,24,39,.92); color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 18px; max-width: 92%; display: none; z-index: 20; text-align: center; }
+  #dlg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-end; z-index: 15; }
+  #dlg.on { display: flex; }
+  #dlg .box { background: #fff; width: 100%; border-radius: 18px 18px 0 0; padding: 18px 16px 10px; }
+  #dlg .msg { font-size: 21px; white-space: pre-line; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="hTitle">Quét chuyển tuyến</h1>
+  <button id="btnMine" title="Yêu cầu đã gửi">📋</button>
+  <button id="btnGear" title="Cài đặt">⚙</button>
+</header>
+<main>
+  <!-- 1. Cài đặt lần đầu -->
+  <section id="sSetup">
+    <div class="card">
+      <b>Cài đặt lần đầu</b>
+      <p class="muted">Nhờ nhân viên nghiệp vụ mở <b>Cài đặt</b> trong add-in Chrome để hiện <b>mã QR cài đặt</b>, rồi bấm nút dưới đây và đưa camera vào mã đó.</p>
+    </div>
+    <button class="big pri" id="btnScanSetup">📷 Quét mã QR cài đặt</button>
+    <details class="card">
+      <summary class="muted">Hoặc dán mã cài đặt</summary>
+      <textarea id="setupText" placeholder="PNS1|https://script.google.com/macros/s/.../exec|token|..."></textarea>
+      <button class="big sec" id="btnSetupText">Lưu mã cài đặt</button>
+    </details>
+  </section>
+
+  <!-- 2. Chọn tên -->
+  <section id="sWho">
+    <div class="card"><b>Bạn là ai?</b><div class="muted" id="whoOffice"></div></div>
+    <div class="list" id="whoList"></div>
+    <div class="card">
+      <div class="muted">Không có tên trong danh sách? Gõ tên của bạn:</div>
+      <input id="whoInput" placeholder="VD: Nguyễn Văn A">
+      <button class="big pri" id="btnWhoSave">Lưu tên</button>
+    </div>
+  </section>
+
+  <!-- 3. Chọn tuyến -->
+  <section id="sHome">
+    <div class="card" id="outboxCard" style="display:none"></div>
+    <div class="card"><b>Chuyển các bưu gửi sang tuyến nào?</b>
+      <input id="routeSearch" placeholder="🔍 Tìm tuyến (gõ tên xã hoặc mã)">
+    </div>
+    <div class="list" id="routeList"></div>
+  </section>
+
+  <!-- 4. Quét -->
+  <section id="sScan">
+    <div class="routeBar">→ <b id="scanRoute"></b><button id="btnChangeRoute">Đổi tuyến</button></div>
+    <div id="camBox">
+      <video id="video" playsinline muted></video>
+      <div class="guide" id="guide"></div>
+      <div class="flash" id="flash"></div>
+      <div id="camMsg">Đưa mã vạch vào khung cam</div>
+    </div>
+    <div class="counter"><span class="n" id="count">0</span><span>bưu gửi</span><span class="last" id="lastCode"></span></div>
+    <div class="row">
+      <button class="big sec" id="btnManual">⌨ Nhập tay</button>
+      <button class="big go" id="btnSend" disabled>Gửi</button>
+    </div>
+    <ul class="codes" id="codeList"></ul>
+    <button class="big sec" id="btnClear" style="display:none">🗑 Xóa hết, quét lại</button>
+  </section>
+
+  <!-- 5. Quét QR cài đặt -->
+  <section id="sQr">
+    <div class="card"><b>Đưa camera vào mã QR cài đặt</b></div>
+    <div id="qrHolder"></div>
+    <button class="big sec" id="btnQrCancel">Hủy</button>
+  </section>
+
+  <!-- 6. Kết quả gửi -->
+  <section id="sDone">
+    <div class="card" id="doneBox"></div>
+    <button class="big pri" id="btnAgain">📷 Quét lô mới</button>
+    <button class="big sec" id="btnDoneMine">📋 Xem các yêu cầu đã gửi</button>
+  </section>
+
+  <!-- 7. Yêu cầu của tôi -->
+  <section id="sMine">
+    <div class="card"><b>Yêu cầu đã gửi</b> <span class="muted" id="mineWho"></span></div>
+    <div id="mineList"></div>
+    <button class="big sec" id="btnMineBack">← Quay lại</button>
+  </section>
+
+  <!-- 8. Cài đặt -->
+  <section id="sGear">
+    <div class="card" id="gearInfo"></div>
+    <button class="big sec" id="btnGearName">Đổi tên bưu tá</button>
+    <button class="big sec" id="btnGearReload">Tải lại danh sách tuyến</button>
+    <button class="big sec" id="btnGearReset">Cài đặt lại (quét QR khác)</button>
+    <button class="big sec" id="btnGearBack">← Quay lại</button>
+  </section>
+</main>
+
+<div id="dlg"><div class="box">
+  <div class="msg" id="dlgMsg"></div>
+  <input id="dlgInput" style="display:none; margin-top:12px" autocapitalize="characters" autocomplete="off">
+  <div class="row"><button class="big sec" id="dlgNo">Hủy</button><button class="big go" id="dlgYes">Đồng ý</button></div>
+</div></div>
+<div id="toast"></div>
+
+<script src="zxing.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

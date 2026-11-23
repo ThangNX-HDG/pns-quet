@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'vn.senpos.pnsquet'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'vn.senpos.pnsquet'
+        minSdk 24
+        targetSdk 34
+        // Mỗi lần GitHub build sẽ tự tăng số phiên bản để cài đè được bản cũ
+        versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        versionName "1.0." + (System.getenv('GITHUB_RUN_NUMBER') ?: '0')
+    }
+
+    signingConfigs {
+        release {
+            // Khóa ký cố định -> các bản sau cài đè lên bản trước, không phải gỡ app
+            storeFile file('pnsquet.jks')
+            storePassword 'pnsquet2026'
+            keyAlias 'pnsquet'
+            keyPassword 'pnsquet2026'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
